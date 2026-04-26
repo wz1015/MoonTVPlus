@@ -158,6 +158,10 @@ export interface AdminConfig {
       Enabled: boolean;
       Authorization: string;
     };
+    Baidu?: {
+      Enabled: boolean;
+      Cookie: string;
+    };
   };
   AIConfig?: {
     Enabled: boolean; // 是否启用AI问片功能

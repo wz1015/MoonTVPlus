@@ -676,6 +676,10 @@ export function configSelfCheck(adminConfig: AdminConfig): AdminConfig {
         Enabled: false,
         Authorization: '',
       },
+      Baidu: {
+        Enabled: false,
+        Cookie: '',
+      },
     };
   }
 
@@ -693,6 +697,13 @@ export function configSelfCheck(adminConfig: AdminConfig): AdminConfig {
     adminConfig.NetDiskConfig.Mobile = {
       Enabled: false,
       Authorization: '',
+    };
+  }
+
+  if (!adminConfig.NetDiskConfig.Baidu) {
+    adminConfig.NetDiskConfig.Baidu = {
+      Enabled: false,
+      Cookie: '',
     };
   }
 

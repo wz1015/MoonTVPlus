@@ -7,12 +7,18 @@ import { getAvailableApiSites, getCacheTime, getConfig } from '@/lib/config';
 import { getDetailFromApiV2 } from '@/lib/downstream';
 import { getProxyToken } from '@/lib/emby-token';
 import {
+  createBaiduNetdiskSession,
+  getBaiduNetdiskSession,
+  parseBaiduNetdiskId,
+  refreshBaiduNetdiskSession,
+} from '@/lib/netdisk/baidu-session-cache';
+import {
   createMobileNetdiskSession,
   getMobileNetdiskSession,
   parseMobileNetdiskId,
   refreshMobileNetdiskSession,
 } from '@/lib/netdisk/mobile-session-cache';
-import { LEGACY_QUARK_TEMP_SOURCE, NETDISK_MOBILE_SOURCE, NETDISK_QUARK_SOURCE, normalizeNetdiskSource } from '@/lib/netdisk/source';
+import { LEGACY_QUARK_TEMP_SOURCE, NETDISK_BAIDU_SOURCE, NETDISK_MOBILE_SOURCE, NETDISK_QUARK_SOURCE, normalizeNetdiskSource } from '@/lib/netdisk/source';
 import {
   executeSavedSourceScript,
   normalizeScriptDetailResult,
@@ -343,6 +349,76 @@ export async function GET(request: NextRequest) {
         douban_id: 0,
         desc: `移动云盘分享：${mobileSession.shareUrl}`,
         episodes,
+        episodes_titles: parsedFiles.map((file) => file.displayTitle),
+        proxyMode: false,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        { error: (error as Error).message },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (sourceCode === NETDISK_BAIDU_SOURCE) {
+    try {
+      const config = await getConfig();
+      const baiduConfig = config.NetDiskConfig?.Baidu;
+      if (!baiduConfig?.Enabled || !baiduConfig.Cookie) {
+        throw new Error('百度网盘未配置或未启用');
+      }
+
+      let session = refreshBaiduNetdiskSession(id) || getBaiduNetdiskSession(id);
+      if (!session) {
+        const payload = parseBaiduNetdiskId(id);
+        const { listBaiduShareVideos } = await import('@/lib/netdisk/baidu.client');
+        const result = await listBaiduShareVideos(payload.shareUrl, baiduConfig.Cookie, payload.passcode || '');
+        session = createBaiduNetdiskSession({
+          title: title || result.title,
+          shareUrl: payload.shareUrl,
+          passcode: payload.passcode,
+          files: result.files,
+          meta: result.meta,
+          cookie: result.cookie,
+        });
+      }
+      if (!session) {
+        throw new Error('百度网盘播放信息恢复失败');
+      }
+      const baiduSession = session;
+      const { parseVideoFileName } = await import('@/lib/video-parser');
+      const parsedFiles = baiduSession.files
+        .map((file, index) => {
+          const parsed = parseVideoFileName(file.name);
+          return {
+            ...file,
+            originalIndex: index,
+            sortEpisode: parsed.episode || index + 1,
+            isOVA: parsed.isOVA,
+            displayTitle:
+              parsed.title || (parsed.episode ? `第${parsed.episode}集` : file.name),
+          };
+        })
+        .sort((a, b) => {
+          if (a.isOVA && !b.isOVA) return 1;
+          if (!a.isOVA && b.isOVA) return -1;
+          return a.sortEpisode !== b.sortEpisode
+            ? a.sortEpisode - b.sortEpisode
+            : a.name.localeCompare(b.name, 'zh-Hans-CN', { numeric: true, sensitivity: 'base' });
+        });
+
+      return NextResponse.json({
+        source: NETDISK_BAIDU_SOURCE,
+        source_name: '百度网盘',
+        id: baiduSession.id,
+        title: title || baiduSession.title,
+        poster: '',
+        year: '',
+        douban_id: 0,
+        desc: `百度网盘分享：${baiduSession.shareUrl}`,
+        episodes: parsedFiles.map((file) => (
+          `/api/netdisk/baidu/play?id=${encodeURIComponent(baiduSession.id)}&episodeIndex=${file.originalIndex}`
+        )),
         episodes_titles: parsedFiles.map((file) => file.displayTitle),
         proxyMode: false,
       });

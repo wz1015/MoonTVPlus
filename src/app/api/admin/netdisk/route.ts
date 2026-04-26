@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getConfig, setCachedConfig } from '@/lib/config';
 import { db } from '@/lib/db';
+import { assertBaiduCookieHeaderSafe, normalizeBaiduCookie } from '@/lib/netdisk/baidu.client';
 import {
   assertMobileAuthorizationHeaderSafe,
   normalizeMobileAuthorization,
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { action, Quark, Mobile, provider } = body;
+    const { action, Quark, Mobile, Baidu, provider } = body;
     const adminConfig = await getConfig();
 
     if (action === 'save') {
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest) {
       const normalizedMobileAuthorization = Mobile?.Authorization
         ? assertMobileAuthorizationHeaderSafe(Mobile.Authorization)
         : '';
+      const normalizedBaiduCookie = Baidu?.Cookie ? assertBaiduCookieHeaderSafe(Baidu.Cookie) : '';
 
       adminConfig.NetDiskConfig = adminConfig.NetDiskConfig || {};
       adminConfig.NetDiskConfig.Quark = {
@@ -64,6 +66,10 @@ export async function POST(request: NextRequest) {
       adminConfig.NetDiskConfig.Mobile = {
         Enabled: Boolean(Mobile?.Enabled),
         Authorization: normalizedMobileAuthorization,
+      };
+      adminConfig.NetDiskConfig.Baidu = {
+        Enabled: Boolean(Baidu?.Enabled),
+        Cookie: normalizedBaiduCookie,
       };
 
       await db.saveAdminConfig(adminConfig);
@@ -82,6 +88,16 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           message: '移动云盘 Authorization 格式正常',
+        });
+      }
+      if (provider === 'baidu') {
+        if (!Baidu?.Cookie) {
+          return NextResponse.json({ error: '请先填写百度网盘 Cookie' }, { status: 400 });
+        }
+        normalizeBaiduCookie(Baidu.Cookie);
+        return NextResponse.json({
+          success: true,
+          message: '百度网盘 Cookie 格式正常',
         });
       }
 

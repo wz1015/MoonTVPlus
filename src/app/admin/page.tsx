@@ -3708,6 +3708,8 @@ const NetDiskConfigComponent = ({
   const [openListTempPath, setOpenListTempPath] = useState('/');
   const [mobileEnabled, setMobileEnabled] = useState(false);
   const [mobileAuthorization, setMobileAuthorization] = useState('');
+  const [baiduEnabled, setBaiduEnabled] = useState(false);
+  const [baiduCookie, setBaiduCookie] = useState('');
 
   useEffect(() => {
     const quark = config?.NetDiskConfig?.Quark;
@@ -3719,6 +3721,8 @@ const NetDiskConfigComponent = ({
     setOpenListTempPath(quark?.OpenListTempPath || '/');
     setMobileEnabled(mobile?.Enabled || false);
     setMobileAuthorization(mobile?.Authorization || '');
+    setBaiduEnabled(config?.NetDiskConfig?.Baidu?.Enabled || false);
+    setBaiduCookie(config?.NetDiskConfig?.Baidu?.Cookie || '');
   }, [config]);
 
   const handleSave = async () => {
@@ -3738,6 +3742,10 @@ const NetDiskConfigComponent = ({
           Mobile: {
             Enabled: mobileEnabled,
             Authorization: mobileAuthorization,
+          },
+          Baidu: {
+            Enabled: baiduEnabled,
+            Cookie: baiduCookie,
           },
         }),
       });
@@ -3802,6 +3810,34 @@ const NetDiskConfigComponent = ({
         }
 
         showSuccess(data.message || '移动云盘验证头格式正常', showAlert);
+      } catch (error) {
+        showError(error instanceof Error ? error.message : '校验失败', showAlert);
+        throw error;
+      }
+    });
+  };
+
+  const handleValidateBaidu = async () => {
+    await withLoading('validateBaiduNetDisk', async () => {
+      try {
+        const response = await fetch('/api/admin/netdisk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'validate',
+            provider: 'baidu',
+            Baidu: {
+              Cookie: baiduCookie,
+            },
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || '校验失败');
+        }
+
+        showSuccess(data.message || '百度网盘 Cookie 格式正常', showAlert);
       } catch (error) {
         showError(error instanceof Error ? error.message : '校验失败', showAlert);
         throw error;
@@ -3974,6 +4010,64 @@ const NetDiskConfigComponent = ({
               className={buttonStyles.primary}
             >
               {isLoading('validateMobileNetDisk') ? '校验中...' : '校验移动云盘验证头'}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isLoading('saveNetDisk')}
+              className={buttonStyles.success}
+            >
+              {isLoading('saveNetDisk') ? '保存中...' : '保存配置'}
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <details className='pt-4 border-t border-gray-200 dark:border-gray-700'>
+        <summary className='text-sm font-semibold text-gray-900 dark:text-gray-100 cursor-pointer'>
+          百度网盘
+        </summary>
+        <div className='mt-4 space-y-4'>
+          <div className='flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700'>
+            <div>
+              <h3 className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+                启用百度网盘
+              </h3>
+              <p className='text-xs text-gray-500 dark:text-gray-400 mt-1'>
+                开启后，网盘搜索中的百度网盘资源会显示“立即播放”按钮
+              </p>
+            </div>
+            <label className='relative inline-flex items-center cursor-pointer'>
+              <input
+                type='checkbox'
+                checked={baiduEnabled}
+                onChange={(e) => setBaiduEnabled(e.target.checked)}
+                className='sr-only peer'
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-sky-300 dark:peer-focus:ring-sky-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-sky-600"></div>
+            </label>
+          </div>
+
+          <div>
+            <label className='block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2'>
+              Cookie
+            </label>
+            <textarea
+              value={baiduCookie}
+              onChange={(e) => setBaiduCookie(e.target.value)}
+              disabled={!baiduEnabled}
+              rows={5}
+              placeholder='粘贴百度网盘 Cookie'
+              className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-sky-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed'
+            />
+          </div>
+
+          <div className='flex gap-3'>
+            <button
+              onClick={handleValidateBaidu}
+              disabled={!baiduEnabled || !baiduCookie || isLoading('validateBaiduNetDisk')}
+              className={buttonStyles.primary}
+            >
+              {isLoading('validateBaiduNetDisk') ? '校验中...' : '校验百度网盘 Cookie'}
             </button>
             <button
               onClick={handleSave}

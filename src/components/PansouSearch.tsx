@@ -163,7 +163,13 @@ export default function PansouSearch({
   const handleNetdiskInstantPlay = async (cloudType: string, link: PansouLink) => {
     try {
       setPlayingUrl(link.url);
-      const response = await fetch(cloudType === 'mobile' ? '/api/netdisk/mobile/instant-play' : '/api/netdisk/quark/instant-play', {
+      const instantPlayApi =
+        cloudType === 'mobile'
+          ? '/api/netdisk/mobile/instant-play'
+          : cloudType === 'baidu'
+            ? '/api/netdisk/baidu/instant-play'
+            : '/api/netdisk/quark/instant-play';
+      const response = await fetch(instantPlayApi, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -181,7 +187,7 @@ export default function PansouSearch({
       }
 
       router.push(
-        `/play?source=${encodeURIComponent(data.source || (cloudType === 'mobile' ? 'netdisk-mobile' : 'netdisk-quark'))}&id=${encodeURIComponent(data.id)}&title=${encodeURIComponent(data.title || keyword)}`
+        `/play?source=${encodeURIComponent(data.source || (cloudType === 'mobile' ? 'netdisk-mobile' : cloudType === 'baidu' ? 'netdisk-baidu' : 'netdisk-quark'))}&id=${encodeURIComponent(data.id)}&title=${encodeURIComponent(data.title || keyword)}`
       );
     } catch (err: any) {
       setToast({
@@ -339,7 +345,7 @@ export default function PansouSearch({
 
                       {/* 操作按钮 */}
                       <div className='flex items-center gap-1 flex-shrink-0'>
-                        {(cloudType === 'quark' || cloudType === 'mobile') && (
+                        {(cloudType === 'quark' || cloudType === 'mobile' || cloudType === 'baidu') && (
                           <>
                             <button
                               onClick={() => handleNetdiskInstantPlay(cloudType, link)}
